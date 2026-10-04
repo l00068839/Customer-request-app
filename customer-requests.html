@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Requests</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #f4f5f7;
+        color: #222;
+    }
+    .container {
+        max-width: 1000px;
+        margin: 30px auto;
+        padding: 0 18px;
+    }
+    h1 { margin-bottom: 6px; }
+    .subtitle { color: #666; margin-top: 0; }
+    .toolbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 20px 0;
+    }
+    button, select, input, textarea {
+        font: inherit;
+    }
+    button {
+        border: 0;
+        border-radius: 6px;
+        padding: 9px 14px;
+        cursor: pointer;
+    }
+    .primary { background: #2563eb; color: white; }
+    .secondary { background: #e5e7eb; }
+    .danger { background: #dc2626; color: white; }
+    input, select, textarea {
+        width: 100%;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 9px;
+        background: white;
+    }
+    .search { flex: 1; min-width: 220px; }
+    .card {
+        background: white;
+        border-radius: 8px;
+        padding: 18px;
+        margin-bottom: 12px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .request-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        align-items: flex-start;
+    }
+    .request-title { margin: 0 0 6px; }
+    .meta { color: #666; font-size: 14px; }
+    .notes {
+        margin: 14px 0;
+        white-space: pre-wrap;
+    }
+    .status {
+        display: inline-block;
+        padding: 5px 9px;
+        border-radius: 20px;
+        font-size: 13px;
+        background: #e5e7eb;
+    }
+    .status.new { background: #dbeafe; color: #1d4ed8; }
+    .status.progress { background: #fef3c7; color: #92400e; }
+    .status.completed { background: #dcfce7; color: #166534; }
+    .actions { display: flex; gap: 7px; flex-wrap: wrap; }
+    .empty { text-align: center; color: #777; padding: 35px; }
+    dialog {
+        border: 0;
+        border-radius: 10px;
+        padding: 0;
+        width: min(520px, calc(100% - 30px));
+        box-shadow: 0 15px 50px rgba(0,0,0,.25);
+    }
+    dialog::backdrop { background: rgba(0,0,0,.35); }
+    .dialog-body { padding: 22px; }
+    .field { margin-bottom: 14px; }
+    .field label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
+    }
+    @media (max-width: 600px) {
+        .request-header { flex-direction: column; }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Customer Requests</h1>
+    <p class="subtitle">Simple customer request tracker</p>
+
+    <div class="toolbar">
+        <input id="search" class="search" type="search" placeholder="Search requests...">
+        <select id="filter">
+            <option value="All">All statuses</option>
+            <option value="New">New</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+        </select>
+        <button class="primary" onclick="openForm()">+ Add Request</button>
+    </div>
+
+    <div id="requests"></div>
+</div>
+
+<dialog id="requestDialog">
+    <div class="dialog-body">
+        <h2 id="formTitle">Add Request</h2>
+        <form id="requestForm">
+            <input type="hidden" id="requestId">
+
+            <div class="field">
+                <label for="customer">Customer name</label>
+                <input id="customer" required>
+            </div>
+
+            <div class="field">
+                <label for="subject">Request</label>
+                <input id="subject" required>
+            </div>
+
+            <div class="field">
+                <label for="notes">Notes</label>
+                <textarea id="notes" rows="4"></textarea>
+            </div>
+
+            <div class="field">
+                <label for="status">Status</label>
+                <select id="status">
+                    <option>New</option>
+                    <option>In Progress</option>
+                    <option>Completed</option>
+                </select>
+            </div>
+
+            <div class="dialog-actions">
+                <button type="button" class="secondary" onclick="closeForm()">Cancel</button>
+                <button type="submit" class="primary">Save</button>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+<script>
+const STORAGE_KEY = "customerRequests";
+let requests = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+
+const dialog = document.getElementById("requestDialog");
+const form = document.getElementById("requestForm");
+
+function saveData() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
+}
+
+function openForm(id = null) {
+    form.reset();
+    document.getElementById("requestId").value = "";
+    document.getElementById("formTitle").textContent = "Add Request";
+    document.getElementById("status").value = "New";
+
+    if (id) {
+        const r = requests.find(x => x.id === id);
+        if (!r) return;
+        document.getElementById("formTitle").textContent = "Edit Request";
+        document.getElementById("requestId").value = r.id;
+        document.getElementById("customer").value = r.customer;
+        document.getElementById("subject").value = r.subject;
+        document.getElementById("notes").value = r.notes;
+        document.getElementById("status").value = r.status;
+    }
+
+    dialog.showModal();
+    document.getElementById("customer").focus();
+}
+
+function closeForm() {
+    dialog.close();
+}
+
+form.addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    const id = document.getElementById("requestId").value;
+    const data = {
+        customer: document.getElementById("customer").value.trim(),
+        subject: document.getElementById("subject").value.trim(),
+        notes: document.getElementById("notes").value.trim(),
+        status: document.getElementById("status").value
+    };
+
+    if (id) {
+        const index = requests.findIndex(x => x.id === id);
+        if (index !== -1) {
+            requests[index] = { ...requests[index], ...data };
+        }
+    } else {
+        requests.unshift({
+            id: Date.now().toString(),
+            ...data,
+            date: new Date().toISOString()
+        });
+    }
+
+    saveData();
+    closeForm();
+    render();
+});
+
+function deleteRequest(id) {
+    const r = requests.find(x => x.id === id);
+    if (!r) return;
+
+    if (confirm(`Delete the request from ${r.customer}?`)) {
+        requests = requests.filter(x => x.id !== id);
+        saveData();
+        render();
+    }
+}
+
+function statusClass(status) {
+    if (status === "New") return "new";
+    if (status === "In Progress") return "progress";
+    return "completed";
+}
+
+function formatDate(date) {
+    return new Date(date).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+    });
+}
+
+function render() {
+    const container = document.getElementById("requests");
+    const search = document.getElementById("search").value.toLowerCase();
+    const filter = document.getElementById("filter").value;
+
+    const filtered = requests.filter(r => {
+        const matchesSearch =
+            r.customer.toLowerCase().includes(search) ||
+            r.subject.toLowerCase().includes(search) ||
+            r.notes.toLowerCase().includes(search);
+
+        const matchesStatus = filter === "All" || r.status === filter;
+        return matchesSearch && matchesStatus;
+    });
+
+    if (!filtered.length) {
+        container.innerHTML = `
+            <div class="card empty">
+                No customer requests found.
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map(r => `
+        <div class="card">
+            <div class="request-header">
+                <div>
+                    <h3 class="request-title">${escapeHtml(r.subject)}</h3>
+                    <div class="meta">
+                        ${escapeHtml(r.customer)} · ${formatDate(r.date)}
+                    </div>
+                </div>
+                <span class="status ${statusClass(r.status)}">${escapeHtml(r.status)}</span>
+            </div>
+
+            ${r.notes ? `<div class="notes">${escapeHtml(r.notes)}</div>` : ""}
+
+            <div class="actions">
+                <button class="secondary" onclick="openForm('${r.id}')">Edit</button>
+                <button class="danger" onclick="deleteRequest('${r.id}')">Delete</button>
+            </div>
+        </div>
+    `).join("");
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+document.getElementById("search").addEventListener("input", render);
+document.getElementById("filter").addEventListener("change", render);
+
+render();
+</script>
+</body>
+</html>
